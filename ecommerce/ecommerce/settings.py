@@ -42,7 +42,10 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'crispy_forms',
+    'django_crispy_bulma',
     'shops',
+
+
 ]
 
 MIDDLEWARE = [
@@ -144,4 +147,14 @@ SITE_ID = 1
 LOGIN_REDIRECT_URL = '/'
 
 # CRISPY FORMS
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+# CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = (
+    "bootstrap",
+    "uni_form",
+    "bootstrap3",
+    "bootstrap4",
+    "bulma",
+)
+
+CRISPY_TEMPLATE_PACK = "bulma"
