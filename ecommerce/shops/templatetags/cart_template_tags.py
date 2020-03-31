@@ -1,6 +1,6 @@
-from django import template
 from shops.models import Order
 
+from django import template
 register = template.Library()
 
 @register.filter
