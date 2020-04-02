@@ -11,8 +11,8 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 # Create your views here.
 # from django.contrib.staticfiles
-
-from .models import Item, OrderItem, Order
+from .forms import CheckoutForm
+from .models import Item, OrderItem, Order, BillingAddress
 
 def products(request):
 	context = {
@@ -22,8 +22,49 @@ def products(request):
 	}
 	return render(request, "products.html", context)
 
-def checkout(request):
-	return render(request, "checkout.html")
+class CheckoutView(View):
+	def get(self, *args, **kwargs):
+		form = CheckoutForm()
+		context = {
+			'form': form
+		}
+		return render(self.request, "checkout.html", context)
+
+	def post(self, *args, **kwargs):
+		form = CheckoutForm(self.request.POST or None)
+		# Check if user have an order
+		try:
+			order = Order.objects.get(user=self.request.user, ordered=False)
+			if form.is_valid():
+				street_address = form.cleaned_data.get('street_address')
+				apartment_address = form.cleaned_data.get('apartment_address')
+				country = form.cleaned_data.get('country')
+				zip = form.cleaned_data('zip')
+				# TODO: Functionality for these field
+				# same_shippin_address = form.cleaned_data.get(
+				# 	'same_shippin_address')
+				# save_info = form.cleaned_data.get('save_info')
+				payment_option = form.cleaned_data.get('payment_option')
+
+				billing_address = BillingAddress(
+					user=self.request.user,
+					street_address=street_address,
+					apartment_address=apartment_address,
+					country=country,
+					zip=zip
+				)
+				billing_address.save()
+				order.billing_address = billing_address
+				order.save()
+				# TODO: add redirect to the selected payment option
+				return redirect('shops:checkout')
+			messages.warning(self.request, "Failed Checkout")
+			return redirect('shops:checkout')
+		except ObjectDoesNotExist:
+			messages.error(self.request, "You do not have an active order")
+			return redirect("shops:order-summary")
+
+
 
 def about(request):
 	return render(request, "about.html")
