@@ -12,7 +12,11 @@ from django.utils.decorators import method_decorator
 # Create your views here.
 # from django.contrib.staticfiles
 from .forms import CheckoutForm
-from .models import Item, OrderItem, Order, BillingAddress
+from .models import Item, OrderItem, Order, BillingAddress, Payment
+import stripe
+
+stripe.api_key = "pk_test_B471oTONAVuayztFhrOFhxqD00vmj5u5c9"
+
 
 def products(request):
 	context = {
@@ -39,7 +43,7 @@ class CheckoutView(View):
 				street_address = form.cleaned_data.get('street_address')
 				apartment_address = form.cleaned_data.get('apartment_address')
 				country = form.cleaned_data.get('country')
-				zip = form.cleaned_data('zip')
+				zip = form.cleaned_data.get('zip')
 				# TODO: Functionality for these field
 				# same_shippin_address = form.cleaned_data.get(
 				# 	'same_shippin_address')
@@ -57,14 +61,21 @@ class CheckoutView(View):
 				order.billing_address = billing_address
 				order.save()
 				# TODO: add redirect to the selected payment option
-				return redirect('shops:checkout')
-			messages.warning(self.request, "Failed Checkout")
-			return redirect('shops:checkout')
+
+				if payment_option == 'S':
+					return redirect('shops:payment', payment_option='stripe')
+				elif payment_option == 'M':
+					return redirect('shops:payment', payment_option='mpesa')
+				else:
+					messages.warning(self.request, "Invalid payment selected")
+					return redirect('shops:checkout')
 		except ObjectDoesNotExist:
 			messages.error(self.request, "You do not have an active order")
 			return redirect("shops:order-summary")
 
-
+class PaymentView(View):
+	def get(self, *args, **kwargs):
+		return render(self.request, "payment.html")
 
 def about(request):
 	return render(request, "about.html")
@@ -73,6 +84,79 @@ class HomeView(ListView):
 	model = Item
 	paginate_by = 8
 	template_name = "home.html"
+
+class PaymentViews(View):
+	def get(self, *args, **kwargs):
+		order = Order.objects.get(user=self.request.user, ordered=False)
+		context = {
+			'order': order
+		}
+		return render(self.request, "payment.html", context)
+
+	def post(self, *args, **kwargs):
+		order = Order.objects.get(user=self.request.user, ordered=False)
+		token = self.request.POST.get('stripeToken')
+		amount = int(order.get_total() * 100)
+		try:
+			charge = stripe.Charge.create(
+			  amount=amount, #cents
+			  currency="usd",
+			  source=token, # obtained with Stripe.js
+			  idempotency_key='PtJwqzZri2xry7MQ',
+			)
+			# Create the payement
+			payement = Payment()
+			payment.stipe_change_id = charge['id']
+			payment.user = self.request.user
+			payment.amount = order.get_total()
+			payment.save()
+
+			# assign the payment to the Order
+			order.ordered = True
+			order.payment = payment
+			order.save()
+
+			messages.success(self.request, "Your order was successfull")
+			return redirect("/")
+
+		except stripe.error.CardError as e:
+			body = e.json_body
+			err = body.get('error', {})
+			# messages.error(self.request, f"{err.get('message')}")
+			message.error(self.request, "%s" %(err.get('message')))
+			return redirect("/")
+
+		except stripe.error.RateLimitError as e:
+		  # Too many requests made to the API too quickly
+		  messages.error(self.request, "Rate limit error")
+		  return redirect("/")
+
+		except stripe.error.InvalidRequestError as e:
+		  # Invalid parameters were supplied to Stripe's API
+		  messages.error(self.request, "Invalid parameters")
+		  return redirect("/")
+
+		except stripe.error.AuthenticationError as e:
+		  # Authentication with Stripe's API failed
+		  # (maybe you changed API keys recently)
+		  messages.error(self.request, "Not authenticated")
+		  return redirect("/")
+
+		except stripe.error.APIConnectionError as e:
+		  # Network communication with Stripe failed
+		  messages.error(self.request, "Network Error")
+		  return redirect("/")
+		except stripe.error.StripeError as e:
+		  # Display a very generic error to the user, and maybe send
+		  # yourself an email
+		  messages.error(self.request, "Something went wrong. you were not charged. Please try again")
+		  return redirect("/")
+		except Exception as e:
+		  # Something else happened, completely unrelated to Stripe
+		  # Send an email to ourselves
+		  messages.error(self.request, "A serious error occurred. We have been notified")
+		  return redirect("/")
+
 
 # Summary Orders
 @method_decorator(login_required, name='dispatch')
