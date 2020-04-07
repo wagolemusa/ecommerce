@@ -9,7 +9,6 @@ PAYMENT_CHOICES = (
 
 )
 
-
 class CheckoutForm(forms.Form):
 	street_address = forms.CharField(widget=forms.TextInput(attrs={
 		'class': 'form-control'
