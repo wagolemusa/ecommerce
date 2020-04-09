@@ -12,8 +12,15 @@ from django.utils.decorators import method_decorator
 # Create your views here.
 # from django.contrib.staticfiles
 from .forms import CheckoutForm
-from .models import Item, OrderItem, Order, BillingAddress, Payment
+from .mpesa import Mpesaform
+from .models import Item, OrderItem, Order, BillingAddress, Payment, Mpesapay
 import stripe
+import base64
+import requests
+import ssl
+import json
+from requests.auth import HTTPBasicAuth
+import datetime
 
 stripe.api_key = "pk_test_B471oTONAVuayztFhrOFhxqD00vmj5u5c9"
 
@@ -65,7 +72,7 @@ class CheckoutView(View):
 				if payment_option == 'S':
 					return redirect('shops:payment', payment_option='stripe')
 				elif payment_option == 'M':
-					return redirect('shops:payment', payment_option='mpesa')
+					return redirect('shops:mpesapay', payment_option='mpesa')
 				else:
 					messages.warning(self.request, "Invalid payment selected")
 					return redirect('shops:checkout')
@@ -75,6 +82,7 @@ class CheckoutView(View):
 
 class PaymentView(View):
 	def get(self, *args, **kwargs):
+
 		return render(self.request, "payment.html")
 
 def about(request):
@@ -84,6 +92,82 @@ class HomeView(ListView):
 	model = Item
 	paginate_by = 8
 	template_name = "home.html"
+
+class Mpesa(View):
+	def get(self, *args, **kwargs):
+		form = Mpesaform()
+		order = Order.objects.get(user=self.request.user, ordered=False)
+		context = {
+			'order': order,
+			'form': form
+		}
+		return render(self.request, "mpesapay.html", context)
+
+	def post(self, *args, **kwargs):
+		form = Mpesaform(self.request.POST or None)
+		try:
+			order = Order.objects.get(user=self.request.user, ordered=False)
+			amount = int(order.get_total())
+			print(amount)
+			if form.is_valid():
+				phone = form.cleaned_data.get('phone')
+
+				pay_bills = Mpesapay(
+					user = self.request.user,
+					phone=phone,
+					amount=amount,
+				)
+				pay_bills.save()
+				# Lipa na mpesa Functionality 
+				consumer_key = "EKyBEUXldtz0pAlmfv6fDELROh5vwQH0"
+				consumer_secret = "KADx7lxZWJdU0TcW"
+
+				# api_URL = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" #AUTH URL
+				api_URL = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+
+				r = requests.get(api_URL, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+
+				data = r.json()
+				access_token = "Bearer" + ' ' + data['access_token']
+
+				#GETTING THE PASSWORD
+				timestamp = datetime.datetime.today().strftime('%Y%m%d%H%M%S')
+				passkey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
+				business_short_code = "174379"
+				data = business_short_code + passkey + timestamp
+				encoded = base64.b64encode(data.encode())
+				password = encoded.decode('utf-8')
+
+
+				# BODY OR PAYLOAD
+				payload = {
+				    "BusinessShortCode": business_short_code,
+				    "Password": password,
+				    "Timestamp": timestamp,
+				    "TransactionType": "CustomerPayBillOnline",
+				    "Amount": amount,
+				    "PartyA": phone,
+				    "PartyB": business_short_code,
+				    "PhoneNumber": phone,
+				    "CallBackURL": "https://senditparcel.herokuapp.com/api/v2/callback",
+				    "AccountReference": "account",
+				    "TransactionDesc": "account"
+				}
+
+				#POPULAING THE HTTP HEADER
+				headers = {
+				    "Authorization": access_token,
+				    "Content-Type": "application/json"
+				}
+				url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest" #C2B URL
+				response = requests.post(url, json=payload, headers=headers)
+				print (response.text)
+				# return {"message": 'Wait Response on Your phone'}
+				messages.success(self.request, "Wait Response on Your phone")
+				return redirect("/")
+		except ObjectDoesNotExist:
+			messages.error(self.request, "You do not have an active order")
+			return redirect("shops:order-summary")
 
 class PaymentViews(View):
 	def get(self, *args, **kwargs):
