@@ -83,6 +83,8 @@ class Order(models.Model):
 		'BillingAddress', on_delete=models.SET_NULL, blank=True, null=True)
 	payment = models.ForeignKey(
 		'Payment', on_delete=models.SET_NULL, blank=True, null=True)
+	mpesa_pay = models.ForeignKey(
+		'Mpesapay', on_delete=models.SET_NULL, blank=True, null=True)
 
 	'''
 	1. Item added to cart
@@ -119,3 +121,12 @@ class Payment(models.Model):
 		return self.user.username
 
 		
+class Mpesapay(models.Model):
+	user = models.ForeignKey(settings.AUTH_USER_MODEL,
+													on_delete=models.SET_NULL, blank=True, null=True)
+	amount = models.FloatField()
+	phone = models.IntegerField()
+	timestamp = models.DateTimeField(auto_now_add=True)
+
+	def __str__self(self):
+		return self.user.username

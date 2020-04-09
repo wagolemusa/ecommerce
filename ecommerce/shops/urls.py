@@ -10,6 +10,7 @@ from .views import (
 	remove_from_cart,
 	remove_single_item_from_cart,
 	PaymentViews,
+	Mpesa,
 	
 )
 
@@ -26,4 +27,5 @@ urlpatterns = [
 	path('remove-item-from-cart/<slug>/', remove_single_item_from_cart,
 						 name='remove-single-item-from-cart'),
 	path('payment/<payment_option>/', PaymentViews.as_view(), name='payment'),
+	path('mpesapay/<payment_option>/', Mpesa.as_view(), name='mpesapay')
 ]
