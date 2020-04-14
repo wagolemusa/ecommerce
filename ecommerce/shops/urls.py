@@ -11,6 +11,7 @@ from .views import (
 	remove_single_item_from_cart,
 	PaymentViews,
 	Mpesa,
+	AddCouponView,
 	
 )
 
@@ -27,5 +28,7 @@ urlpatterns = [
 	path('remove-item-from-cart/<slug>/', remove_single_item_from_cart,
 						 name='remove-single-item-from-cart'),
 	path('payment/<payment_option>/', PaymentViews.as_view(), name='payment'),
-	path('mpesapay/<payment_option>/', Mpesa.as_view(), name='mpesapay')
+	path('mpesapay/<payment_option>/', Mpesa.as_view(), name='mpesapay'),
+	path('add-coupan/', AddCouponView.as_view(), name='add-coupan'),
+
 ]

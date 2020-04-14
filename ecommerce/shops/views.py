@@ -11,9 +11,14 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 # Create your views here.
 # from django.contrib.staticfiles
-from .forms import CheckoutForm
+from .forms import CheckoutForm, CouponForm
 from .mpesa import Mpesaform
-from .models import Item, OrderItem, Order, BillingAddress, Payment, Mpesapay
+from .models import (
+				Item, OrderItem,
+				Order, BillingAddress, 
+				Payment, Mpesapay,
+				Coupon
+			)
 import stripe
 import base64
 import requests
@@ -35,11 +40,20 @@ def products(request):
 
 class CheckoutView(View):
 	def get(self, *args, **kwargs):
-		form = CheckoutForm()
-		context = {
-			'form': form
-		}
-		return render(self.request, "checkout.html", context)
+		try:
+			order = Order.objects.get(user=self.request.user, ordered=False)
+			form = CheckoutForm()
+			context = {
+				'form': form,
+				'couponform': CouponForm(),
+				'order': order,
+				'DISPLAY_COUPON_FORM':True
+
+			}
+			return render(self.request, "checkout.html", context)
+		except ObjectDoesNotExist:
+			messages.info(self.request, "You do not have an active oredr")
+			return redirect("shops:checkout")
 
 	def post(self, *args, **kwargs):
 		form = CheckoutForm(self.request.POST or None)
@@ -118,6 +132,7 @@ class Mpesa(View):
 					amount=amount,
 				)
 				pay_bills.save()
+				
 				# Lipa na mpesa Functionality 
 				consumer_key = "EKyBEUXldtz0pAlmfv6fDELROh5vwQH0"
 				consumer_secret = "KADx7lxZWJdU0TcW"
@@ -172,10 +187,16 @@ class Mpesa(View):
 class PaymentViews(View):
 	def get(self, *args, **kwargs):
 		order = Order.objects.get(user=self.request.user, ordered=False)
-		context = {
-			'order': order
-		}
-		return render(self.request, "payment.html", context)
+		if order.billing_address:
+			context = {
+				'order': order,
+				'DISPLAY_COUPON_FORM':False
+			}
+			return render(self.request, "payment.html", context)
+		else:
+			messages.warning(
+				self.request, "You have not added a billing address")
+			return redirect("shops:checkout")
 
 	def post(self, *args, **kwargs):
 		order = Order.objects.get(user=self.request.user, ordered=False)
@@ -194,6 +215,11 @@ class PaymentViews(View):
 			payment.user = self.request.user
 			payment.amount = order.get_total()
 			payment.save()
+
+			order_items = order.items.all()
+			order_items.update(ordered=True)
+			for item in order_items:
+				item.save()
 
 			# assign the payment to the Order
 			order.ordered = True
@@ -352,3 +378,32 @@ def remove_single_item_from_cart(request, slug):
 	else:
 		messages.info(request, "You do not have an active order")
 		return redirect("shops:product", slug=slug)
+
+
+def get_coupon(request, code):
+	try:
+		coupon = Coupon.objects.get(code=code)
+		return coupon
+	except ObjectDoesNotExist:
+		messages.info(request, "This coupon does not exist")
+		return redirect("shops:checkout")
+
+
+
+class AddCouponView(View):
+	def post(self, *args, **kwargs):
+		form = CouponForm(self.request.POST or None)
+		if form.is_valid():
+			try:
+				code = form.cleaned_data.get('code')
+				order = Order.objects.get(
+        	user=self.request.user, ordered=False)
+				order.coupon = get_coupon(self.request, code)
+				order.save()
+				messages.success(self.request, "Successfully added coupon")
+				return redirect("shops:checkout")
+			except ObjectDoesNotExist:
+				messages.info(self.request, "You do not have an active order")
+		return redirect("shops:checkout")
+
+
