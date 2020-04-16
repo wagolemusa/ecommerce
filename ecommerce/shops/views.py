@@ -11,13 +11,13 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 # Create your views here.
 # from django.contrib.staticfiles
-from .forms import CheckoutForm, CouponForm
+from .forms import CheckoutForm, CouponForm, RefundForm
 from .mpesa import Mpesaform
 from .models import (
 				Item, OrderItem,
 				Order, BillingAddress, 
 				Payment, Mpesapay,
-				Coupon
+				Coupon,Refund
 			)
 import stripe
 import base64
@@ -26,9 +26,14 @@ import ssl
 import json
 from requests.auth import HTTPBasicAuth
 import datetime
+import random
+import string
 
 stripe.api_key = "pk_test_B471oTONAVuayztFhrOFhxqD00vmj5u5c9"
 
+
+def create_ref_code():
+	return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
 
 def products(request):
 	context = {
@@ -224,6 +229,7 @@ class PaymentViews(View):
 			# assign the payment to the Order
 			order.ordered = True
 			order.payment = payment
+			order.ref_code = create_ref_code()
 			order.save()
 
 			messages.success(self.request, "Your order was successfull")
@@ -406,4 +412,35 @@ class AddCouponView(View):
 				messages.info(self.request, "You do not have an active order")
 		return redirect("shops:checkout")
 
+class RequestRefundView(View):
+	def get(self, *args, **kwargs):
+		form = RefundForm()
+		context = {
+			'form': form
+		}
+		return render(self.request, "request_refund.html", context)
 
+	def post(self, *args, **kwargs):
+		form = RefundForm(self.request.POST or None)
+		if form.is_valid():
+			ref_code = form.cleaned_data.get('ref_code')
+			message = form.cleaned_data.get('message')
+			email = form.cleaned_data.get('email')
+			# edit the order
+			try:
+				order = Order.objects.get(ref_code=ref_code)
+				order.refund_requested = True
+				order.save()
+
+				# store the refund
+				refund = Refund()
+				refund.order = order
+				refund.reason = message
+				refund.email = email
+				refund.save()
+
+				messages.info(self.request, "You request was received")
+				return redirect("shops:request-refund")
+			except ObjectDoesNotExist:
+				messages.info(self.request, "This order does not exit.")
+				return redirect("shops:request-refund")

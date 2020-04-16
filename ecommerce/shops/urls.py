@@ -12,6 +12,7 @@ from .views import (
 	PaymentViews,
 	Mpesa,
 	AddCouponView,
+	RequestRefundView,
 	
 )
 
@@ -30,5 +31,6 @@ urlpatterns = [
 	path('payment/<payment_option>/', PaymentViews.as_view(), name='payment'),
 	path('mpesapay/<payment_option>/', Mpesa.as_view(), name='mpesapay'),
 	path('add-coupan/', AddCouponView.as_view(), name='add-coupan'),
-
+	path('request-refund/', RequestRefundView.as_view(), name='request-refund'),
+	
 ]
