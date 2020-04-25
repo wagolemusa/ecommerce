@@ -28,7 +28,6 @@ class Item(models.Model):
 	# image = models.ImageField(blank=True, null=True)
 	image = models.ImageField()
 
-
 	def __str__(self):
 		return self.title
 

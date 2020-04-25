@@ -157,8 +157,6 @@ class Mpesa(View):
 				data = business_short_code + passkey + timestamp
 				encoded = base64.b64encode(data.encode())
 				password = encoded.decode('utf-8')
-
-
 				# BODY OR PAYLOAD
 				payload = {
 				    "BusinessShortCode": business_short_code,
