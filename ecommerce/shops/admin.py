@@ -2,7 +2,7 @@ from django.contrib import admin
 
 # Register your models here.
 from .models import (Item, OrderItem, Order, 
-								Payment,BillingAddress,Mpesapay,Coupon,
+								Payment,Address,Mpesapay,Coupon,
 								Refund)
 
 def make_refund_accepted(modeladmin, request, queryset):
@@ -16,6 +16,7 @@ class OrderAdmin(admin.ModelAdmin):
 									'received_requested',
 									'refund_requested',
 									'refund_granted',
+									'shipping_address',
 									'billing_address',
 									'payment',
 									'coupon'
@@ -23,6 +24,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 	list_display_links = [
 		'user',
+		'shipping_address',
 		'billing_address',
 		'payment',
 		'coupon'
@@ -41,11 +43,25 @@ class OrderAdmin(admin.ModelAdmin):
 
 	actions = [make_refund_accepted]
 
+
+class AddressAdmin(admin.ModelAdmin):
+	list_display = [
+		'user',
+		'street_address',
+		'apartment_address',
+		'country',
+		'zip',
+		'address_type',
+		'default'
+	]
+	list_filter = ['default', 'address_type', 'country']
+	search_fields = ['user', 'street_address', 'apartment_address', 'zip']
+
 admin.site.register(Item)
 admin.site.register(OrderItem)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(Payment)
-admin.site.register(BillingAddress)
+admin.site.register(Address, AddressAdmin)
 admin.site.register(Mpesapay)
 admin.site.register(Coupon)
 admin.site.register(Refund)
